@@ -2,7 +2,7 @@ package dev.lamurbob.youtubedl
 
 import android.app.Application
 import android.util.Log
-import com.yausername.youtubedl_android.FFmpeg
+import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
