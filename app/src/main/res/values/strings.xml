@@ -8,8 +8,9 @@
     <string name="download">Download</string>
     <string name="stop">Stop current download</string>
     <string name="update_ytdlp">Update yt-dlp</string>
+    <string name="open_downloads">Open Downloads</string>
     <string name="status_idle">Idle. Paste a YouTube link to begin.</string>
-    <string name="output_waiting">yt-dlp output will appear here.</string>
+    <string name="output_waiting">Downloader output will appear here only if something breaks.</string>
     <string name="output_empty">No command output returned.</string>
     <string name="url_required">Paste a YouTube URL first.</string>
     <string name="url_youtube_only">Only YouTube and youtu.be URLs are supported.</string>
@@ -18,13 +19,15 @@
     <string name="download_already_running">A download is already running.</string>
     <string name="download_starting">Starting download...</string>
     <string name="download_running">Download running...</string>
-    <string name="download_complete">Download complete. Saved to %1$s</string>
+    <string name="download_complete">Download complete. Saved in %1$s</string>
+    <string name="download_complete_file">Download complete: %1$s</string>
     <string name="download_success">Download successful.</string>
     <string name="download_failed">Download failed.</string>
-    <string name="stop_requested">Stop requested. Waiting for yt-dlp to exit.</string>
+    <string name="stop_requested">Stop requested. Waiting for downloader to exit.</string>
     <string name="wait_for_download">Wait for the current download to finish first.</string>
     <string name="update_starting">Updating yt-dlp...</string>
     <string name="update_done">yt-dlp update status: %1$s. Version: %2$s</string>
     <string name="update_failed">yt-dlp update failed.</string>
+    <string name="open_downloads_failed">Could not open Downloads automatically.</string>
     <string name="version_unknown">unknown</string>
 </resources>
