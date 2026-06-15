@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         setupQualitySpinner()
         setupButtons()
         outputText.movementMethod = ScrollingMovementMethod()
+        outputText.visibility = View.GONE
         loadUrlFromIntent(intent)
     }
 
@@ -133,9 +134,9 @@ class MainActivity : AppCompatActivity() {
         val outputTemplate = File(downloadDir, "%(title).160B [%(id)s].%(ext)s").absolutePath
         val selectedFormat = selectedFormat()
 
+        outputText.visibility = View.GONE
         setDownloadingState(true)
         statusText.text = getString(R.string.download_starting)
-        outputText.text = getString(R.string.output_waiting)
 
         lifecycleScope.launch {
             val result = runCatching {
@@ -155,19 +156,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            result.onSuccess { response ->
+            result.onSuccess {
                 progressBar.isIndeterminate = false
                 progressBar.progress = 100
+                outputText.visibility = View.GONE
                 statusText.text = getString(R.string.download_complete, downloadDir.absolutePath)
-                outputText.text = response.out.takeLast(MAX_OUTPUT_CHARS).ifBlank {
-                    getString(R.string.output_empty)
-                }
                 toast(getString(R.string.download_success))
             }.onFailure { error ->
                 progressBar.isIndeterminate = false
                 progressBar.progress = 0
                 statusText.text = getString(R.string.download_failed)
-                outputText.text = error.message ?: error.toString()
+                showOutput(error.message ?: error.toString())
                 toast(getString(R.string.download_failed))
             }
 
@@ -181,7 +180,7 @@ class MainActivity : AppCompatActivity() {
         runCatching {
             YoutubeDL.destroyProcessById(processId)
         }.onFailure { error ->
-            outputText.text = error.message ?: error.toString()
+            showOutput(error.message ?: error.toString())
         }
 
         statusText.text = getString(R.string.stop_requested)
@@ -193,6 +192,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        outputText.visibility = View.GONE
         progressBar.visibility = View.VISIBLE
         progressBar.isIndeterminate = true
         statusText.text = getString(R.string.update_starting)
@@ -213,10 +213,10 @@ class MainActivity : AppCompatActivity() {
                 val version = runCatching { YoutubeDL.versionName(this@MainActivity) }
                     .getOrDefault(getString(R.string.version_unknown))
                 statusText.text = getString(R.string.update_done, status.toString(), version)
-                outputText.text = status.toString()
+                outputText.visibility = View.GONE
             }.onFailure { error ->
                 statusText.text = getString(R.string.update_failed)
-                outputText.text = error.message ?: error.toString()
+                showOutput(error.message ?: error.toString())
             }
 
             progressBar.isIndeterminate = false
@@ -248,9 +248,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun getDownloadLocation(): File {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-        return File(downloadsDir, "YouTubeDL").apply {
-            if (!exists()) mkdirs()
-        }
+        if (!downloadsDir.exists()) downloadsDir.mkdirs()
+        return downloadsDir
     }
 
     private fun setDownloadingState(isDownloading: Boolean) {
@@ -261,6 +260,11 @@ class MainActivity : AppCompatActivity() {
         progressBar.visibility = View.VISIBLE
         progressBar.isIndeterminate = isDownloading
         if (!isDownloading) progressBar.isIndeterminate = false
+    }
+
+    private fun showOutput(message: String) {
+        outputText.text = message.takeLast(MAX_OUTPUT_CHARS)
+        outputText.visibility = View.VISIBLE
     }
 
     private fun loadUrlFromIntent(intent: Intent?) {
