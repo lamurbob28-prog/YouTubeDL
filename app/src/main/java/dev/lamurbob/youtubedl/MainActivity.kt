@@ -1,8 +1,10 @@
 package dev.lamurbob.youtubedl
 
 import android.Manifest
+import android.app.DownloadManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -34,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var downloadButton: Button
     private lateinit var stopButton: Button
     private lateinit var updateButton: Button
+    private lateinit var openDownloadsButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
     private lateinit var outputText: TextView
@@ -65,6 +68,7 @@ class MainActivity : AppCompatActivity() {
         setupButtons()
         outputText.movementMethod = ScrollingMovementMethod()
         outputText.visibility = View.GONE
+        openDownloadsButton.visibility = View.GONE
         loadUrlFromIntent(intent)
     }
 
@@ -81,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         downloadButton = findViewById(R.id.download_button)
         stopButton = findViewById(R.id.stop_button)
         updateButton = findViewById(R.id.update_button)
+        openDownloadsButton = findViewById(R.id.open_downloads_button)
         progressBar = findViewById(R.id.progress_bar)
         statusText = findViewById(R.id.status_text)
         outputText = findViewById(R.id.output_text)
@@ -100,6 +105,7 @@ class MainActivity : AppCompatActivity() {
         downloadButton.setOnClickListener { startDownload() }
         stopButton.setOnClickListener { stopDownload() }
         updateButton.setOnClickListener { updateRuntime() }
+        openDownloadsButton.setOnClickListener { openDownloads() }
         stopButton.isEnabled = false
     }
 
@@ -131,10 +137,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         val downloadDir = getDownloadLocation()
-        val outputTemplate = File(downloadDir, "%(title).160B [%(id)s].%(ext)s").absolutePath
+        val outputTemplate = File(downloadDir, "%(title).120B [%(id)s].%(ext)s").absolutePath
         val selectedFormat = selectedFormat()
 
         outputText.visibility = View.GONE
+        openDownloadsButton.visibility = View.GONE
         setDownloadingState(true)
         statusText.text = getString(R.string.download_starting)
 
@@ -148,6 +155,7 @@ class MainActivity : AppCompatActivity() {
                         addOption("--no-mtime")
                         addOption("--restrict-filenames")
                         addOption("--newline")
+                        addOption("--print", "after_move:filepath")
                         addOption("-f", selectedFormat)
                         addOption("-o", outputTemplate)
                     }
@@ -156,15 +164,24 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            result.onSuccess {
+            result.onSuccess { response ->
+                val downloadedPath = extractDownloadedPath(response.out, downloadDir)
+                scanDownloadedFile(downloadedPath)
+
                 progressBar.isIndeterminate = false
                 progressBar.progress = 100
                 outputText.visibility = View.GONE
-                statusText.text = getString(R.string.download_complete, downloadDir.absolutePath)
+                openDownloadsButton.visibility = View.VISIBLE
+                statusText.text = if (downloadedPath != null) {
+                    getString(R.string.download_complete_file, File(downloadedPath).name)
+                } else {
+                    getString(R.string.download_complete, downloadDir.absolutePath)
+                }
                 toast(getString(R.string.download_success))
             }.onFailure { error ->
                 progressBar.isIndeterminate = false
                 progressBar.progress = 0
+                openDownloadsButton.visibility = View.VISIBLE
                 statusText.text = getString(R.string.download_failed)
                 showOutput(error.message ?: error.toString())
                 toast(getString(R.string.download_failed))
@@ -265,6 +282,30 @@ class MainActivity : AppCompatActivity() {
     private fun showOutput(message: String) {
         outputText.text = message.takeLast(MAX_OUTPUT_CHARS)
         outputText.visibility = View.VISIBLE
+    }
+
+    private fun extractDownloadedPath(output: String, downloadDir: File): String? {
+        val downloadRoot = downloadDir.absolutePath
+        return output
+            .lineSequence()
+            .map { it.trim() }
+            .lastOrNull { line -> line.startsWith(downloadRoot) && File(line).exists() }
+    }
+
+    private fun scanDownloadedFile(filePath: String?) {
+        if (filePath.isNullOrBlank()) return
+        MediaScannerConnection.scanFile(this, arrayOf(filePath), null, null)
+    }
+
+    private fun openDownloads() {
+        val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        runCatching {
+            startActivity(intent)
+        }.onFailure {
+            toast(getString(R.string.open_downloads_failed))
+        }
     }
 
     private fun loadUrlFromIntent(intent: Intent?) {
