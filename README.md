@@ -8,11 +8,14 @@ This is not a pirate cannon with a loading screen. It deliberately avoids cookie
 
 - Android app written in Kotlin
 - Paste or share a YouTube link into the app
+- Supports normal YouTube links and YouTube Shorts links
 - Quality picker: best MP4, 720p, 480p, or audio-only M4A
-- Progress bar with live yt-dlp output
+- Progress bar with live status
 - Stop button for the active download process
 - Update button for the bundled yt-dlp runtime
-- Saves into `Downloads/YouTubeDL`
+- Saves directly into the phone's main `Downloads` folder
+- Shows an **Open Downloads** button after a download finishes
+- Hidden debug output that only appears when something fails
 - Built on `youtubedl-android`, which bundles yt-dlp and Python for Android
 
 ## Legal use
@@ -52,7 +55,8 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## Notes
 
-- Android 10+ storage rules are annoying, because even files need bureaucracy now. Downloads are written to `Downloads/YouTubeDL`.
+- Downloads are written directly to the phone's main `Downloads` folder.
+- After a file finishes, the app asks Android's media scanner to index it and shows an **Open Downloads** button.
 - If extraction breaks, tap **Update yt-dlp** in the app. YouTube changes its internals often enough to qualify as a personality disorder.
 - The app only accepts YouTube / youtu.be URLs and does not pass cookies.
 
@@ -61,7 +65,7 @@ app/build/outputs/apk/debug/app-debug.apk
 ```text
 app/src/main/java/dev/lamurbob/youtubedl/
   MainActivity.kt      Main screen, download logic, update logic
-  YoutubeDlApp.kt      Initializes yt-dlp and FFmpeg
+  YoutubeDlApp.kt      Initializes yt-dlp
 ```
 
 ## License
