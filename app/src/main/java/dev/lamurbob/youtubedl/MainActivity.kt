@@ -20,7 +20,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
-import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
@@ -43,9 +42,9 @@ class MainActivity : AppCompatActivity() {
     private val processId = "youtubedl-main-download"
 
     private val formatOptions = linkedMapOf(
-        "Best MP4 video" to "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "720p MP4" to "bv*[height<=720][ext=mp4]+ba[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]",
-        "480p MP4" to "bv*[height<=480][ext=mp4]+ba[ext=m4a]/best[height<=480][ext=mp4]/best[height<=480]",
+        "Best MP4 video" to "best[ext=mp4]/best",
+        "720p MP4" to "best[height<=720][ext=mp4]/best[height<=720]",
+        "480p MP4" to "best[height<=480][ext=mp4]/best[height<=480]",
         "Audio only M4A" to "bestaudio[ext=m4a]/bestaudio"
     )
 
@@ -99,7 +98,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupButtons() {
         downloadButton.setOnClickListener { startDownload() }
         stopButton.setOnClickListener { stopDownload() }
-        updateButton.setOnClickListener { updateYtDlp() }
+        updateButton.setOnClickListener { updateRuntime() }
         stopButton.isEnabled = false
     }
 
@@ -133,7 +132,6 @@ class MainActivity : AppCompatActivity() {
         val downloadDir = getDownloadLocation()
         val outputTemplate = File(downloadDir, "%(title).160B [%(id)s].%(ext)s").absolutePath
         val selectedFormat = selectedFormat()
-        val audioOnly = selectedFormat == formatOptions["Audio only M4A"]
 
         setDownloadingState(true)
         statusText.text = getString(R.string.download_starting)
@@ -142,27 +140,18 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    YoutubeDL.getInstance().init(applicationContext)
-                    FFmpeg.getInstance().init(applicationContext)
+                    YoutubeDL.init(applicationContext)
 
                     val request = YoutubeDLRequest(url).apply {
                         addOption("--no-playlist")
                         addOption("--no-mtime")
                         addOption("--restrict-filenames")
                         addOption("--newline")
+                        addOption("-f", selectedFormat)
                         addOption("-o", outputTemplate)
-
-                        if (audioOnly) {
-                            addOption("-f", selectedFormat)
-                            addOption("-x")
-                            addOption("--audio-format", "m4a")
-                        } else {
-                            addOption("-f", selectedFormat)
-                            addOption("--merge-output-format", "mp4")
-                        }
                     }
 
-                    YoutubeDL.getInstance().execute(request, processId, progressCallback)
+                    YoutubeDL.execute(request, processId, progressCallback)
                 }
             }
 
@@ -190,7 +179,7 @@ class MainActivity : AppCompatActivity() {
         if (!downloading) return
 
         runCatching {
-            YoutubeDL.getInstance().destroyProcessById(processId)
+            YoutubeDL.destroyProcessById(processId)
         }.onFailure { error ->
             outputText.text = error.message ?: error.toString()
         }
@@ -198,7 +187,7 @@ class MainActivity : AppCompatActivity() {
         statusText.text = getString(R.string.stop_requested)
     }
 
-    private fun updateYtDlp() {
+    private fun updateRuntime() {
         if (downloading) {
             toast(getString(R.string.wait_for_download))
             return
@@ -212,16 +201,16 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    YoutubeDL.getInstance().init(applicationContext)
-                    YoutubeDL.getInstance().updateYoutubeDL(
+                    YoutubeDL.init(applicationContext)
+                    YoutubeDL.updateYoutubeDL(
                         this@MainActivity,
-                        YoutubeDL.UpdateChannel._STABLE
+                        YoutubeDL.UpdateChannel.STABLE
                     )
                 }
             }
 
             result.onSuccess { status ->
-                val version = runCatching { YoutubeDL.getInstance().versionName(this@MainActivity) }
+                val version = runCatching { YoutubeDL.versionName(this@MainActivity) }
                     .getOrDefault(getString(R.string.version_unknown))
                 statusText.text = getString(R.string.update_done, status.toString(), version)
                 outputText.text = status.toString()
