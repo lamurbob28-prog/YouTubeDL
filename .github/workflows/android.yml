@@ -32,3 +32,9 @@ jobs:
 
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouTubeDL-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
