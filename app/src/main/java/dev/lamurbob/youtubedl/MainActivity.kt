@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.textfield.TextInputEditText
+import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
@@ -45,9 +46,10 @@ class MainActivity : AppCompatActivity() {
     private val processId = "youtubedl-main-download"
 
     private val formatOptions = linkedMapOf(
-        "Best MP4 video" to "best[ext=mp4]/best",
-        "720p MP4" to "best[height<=720][ext=mp4]/best[height<=720]",
-        "480p MP4" to "best[height<=480][ext=mp4]/best[height<=480]",
+        "Discord-ready MP4 (recommended)" to "bv*[vcodec^=avc1][height<=720][ext=mp4]+ba[acodec^=mp4a][ext=m4a]/b[vcodec^=avc1][acodec^=mp4a][ext=mp4]/best[ext=mp4]/best",
+        "Discord-ready MP4 480p" to "bv*[vcodec^=avc1][height<=480][ext=mp4]+ba[acodec^=mp4a][ext=m4a]/b[vcodec^=avc1][height<=480][acodec^=mp4a][ext=mp4]/best[height<=480][ext=mp4]/best[height<=480]",
+        "Best MP4 quality" to "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best[ext=mp4]/best",
+        "Small MP4 360p" to "bv*[vcodec^=avc1][height<=360][ext=mp4]+ba[acodec^=mp4a][ext=m4a]/b[vcodec^=avc1][height<=360][acodec^=mp4a][ext=mp4]/best[height<=360][ext=mp4]/best[height<=360]",
         "Audio only M4A" to "bestaudio[ext=m4a]/bestaudio"
     )
 
@@ -139,6 +141,7 @@ class MainActivity : AppCompatActivity() {
         val downloadDir = getDownloadLocation()
         val outputTemplate = File(downloadDir, "%(title).120B [%(id)s].%(ext)s").absolutePath
         val selectedFormat = selectedFormat()
+        val audioOnly = isAudioOnlySelection()
 
         outputText.visibility = View.GONE
         openDownloadsButton.visibility = View.GONE
@@ -149,6 +152,7 @@ class MainActivity : AppCompatActivity() {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     YoutubeDL.init(applicationContext)
+                    FFmpeg.init(applicationContext)
 
                     val request = YoutubeDLRequest(url).apply {
                         addOption("--no-playlist")
@@ -158,6 +162,15 @@ class MainActivity : AppCompatActivity() {
                         addOption("--print", "after_move:filepath")
                         addOption("-f", selectedFormat)
                         addOption("-o", outputTemplate)
+
+                        if (audioOnly) {
+                            addOption("-x")
+                            addOption("--audio-format", "m4a")
+                        } else {
+                            addOption("--merge-output-format", "mp4")
+                            addOption("--remux-video", "mp4")
+                            addOption("--postprocessor-args", "ffmpeg:-movflags +faststart")
+                        }
                     }
 
                     YoutubeDL.execute(request, processId, progressCallback)
@@ -244,6 +257,10 @@ class MainActivity : AppCompatActivity() {
     private fun selectedFormat(): String {
         val label = qualitySpinner.selectedItem?.toString().orEmpty()
         return formatOptions[label] ?: formatOptions.values.first()
+    }
+
+    private fun isAudioOnlySelection(): Boolean {
+        return qualitySpinner.selectedItem?.toString()?.contains("Audio only") == true
     }
 
     private fun ensureStoragePermission(): Boolean {
