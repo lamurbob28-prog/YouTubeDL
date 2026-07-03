@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">YouTubeDL</string>
-    <string name="app_subtitle">Download YouTube videos you own, have permission to save, or that are licensed for reuse.</string>
+    <string name="app_subtitle">Download permitted YouTube videos as simple MP4 files for easy sharing.</string>
     <string name="youtube_url">YouTube URL</string>
     <string name="quality">Quality</string>
     <string name="rights_checkbox">I confirm I have permission or a lawful reason to download this video.</string>
-    <string name="download">Download</string>
+    <string name="download">Download MP4</string>
     <string name="stop">Stop current download</string>
     <string name="update_ytdlp">Update yt-dlp</string>
     <string name="open_downloads">Open Downloads</string>
@@ -14,10 +14,10 @@
     <string name="output_empty">No command output returned.</string>
     <string name="url_required">Paste a YouTube URL first.</string>
     <string name="url_youtube_only">Only YouTube and youtu.be URLs are supported.</string>
-    <string name="rights_required">Check the permission box first. The tiny law goblin demands it.</string>
+    <string name="rights_required">Check the permission box first.</string>
     <string name="storage_permission_needed">Storage permission is needed on older Android versions.</string>
     <string name="download_already_running">A download is already running.</string>
-    <string name="download_starting">Starting download...</string>
+    <string name="download_starting">Starting MP4 download...</string>
     <string name="download_running">Download running...</string>
     <string name="download_complete">Download complete. Saved in %1$s</string>
     <string name="download_complete_file">Download complete: %1$s</string>
