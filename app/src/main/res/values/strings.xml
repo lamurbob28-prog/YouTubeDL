@@ -22,7 +22,7 @@
     <string name="download_complete">Download complete. Saved in %1$s</string>
     <string name="download_complete_file">Download complete: %1$s</string>
     <string name="download_success">Download successful.</string>
-    <string name="download_failed">Download failed.</string>
+    <string name="download_failed">Download failed. Try updating yt-dlp, then use the 360p option.</string>
     <string name="stop_requested">Stop requested. Waiting for downloader to exit.</string>
     <string name="wait_for_download">Wait for the current download to finish first.</string>
     <string name="update_starting">Updating yt-dlp...</string>
