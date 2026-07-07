@@ -45,10 +45,9 @@ class MainActivity : AppCompatActivity() {
     private val processId = "youtubedl-main-download"
 
     private val formatOptions = linkedMapOf(
-        "Discord MP4 360p (safest)" to "best[ext=mp4][vcodec!=none][acodec!=none][height<=360]/best[ext=mp4][vcodec!=none][acodec!=none]",
-        "Discord MP4 480p" to "best[ext=mp4][vcodec!=none][acodec!=none][height<=480]/best[ext=mp4][vcodec!=none][acodec!=none]",
-        "Discord MP4 720p" to "best[ext=mp4][vcodec!=none][acodec!=none][height<=720]/best[ext=mp4][vcodec!=none][acodec!=none]",
-        "Best single-file MP4" to "best[ext=mp4][vcodec!=none][acodec!=none]"
+        "Discord MP4 360p (safest)" to "18",
+        "Discord MP4 720p if available" to "22/18",
+        "Discord MP4 fallback" to "18/22"
     )
 
     private val progressCallback: (Float, Long, String) -> Unit = { progress, _, line ->
