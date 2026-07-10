@@ -2,12 +2,22 @@ name: Android CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -30,8 +40,8 @@ jobs:
         with:
           gradle-version: 8.10.2
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+      - name: Test, lint, and build debug APK
+        run: gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace --no-daemon
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

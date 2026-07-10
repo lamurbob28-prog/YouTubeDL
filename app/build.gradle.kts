@@ -11,8 +11,8 @@ android {
         applicationId = "dev.lamurbob.youtubedl"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         ndk {
             abiFilters.add("x86")
@@ -63,4 +63,6 @@ dependencies {
 
     implementation("io.github.junkfood02.youtubedl-android:library:$youtubedlAndroid")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$youtubedlAndroid")
+
+    testImplementation("junit:junit:4.13.2")
 }

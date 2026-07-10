@@ -13,7 +13,7 @@
     <string name="output_waiting">Downloader output will appear here only if something breaks.</string>
     <string name="output_empty">No command output returned.</string>
     <string name="url_required">Paste a YouTube URL first.</string>
-    <string name="url_youtube_only">Only YouTube and youtu.be URLs are supported.</string>
+    <string name="url_youtube_only">Only HTTPS YouTube and youtu.be URLs are supported.</string>
     <string name="rights_required">Check the permission box first.</string>
     <string name="storage_permission_needed">Storage permission is needed on older Android versions.</string>
     <string name="download_already_running">A download is already running.</string>
@@ -22,12 +22,15 @@
     <string name="download_complete">Download complete. Saved in %1$s</string>
     <string name="download_complete_file">Download complete: %1$s</string>
     <string name="download_success">Download successful.</string>
+    <string name="download_stopped">Download stopped.</string>
     <string name="download_failed">Download failed. Try updating yt-dlp, then use the 360p option.</string>
+    <string name="download_file_missing">The downloader finished without returning an MP4 file.</string>
     <string name="stop_requested">Stop requested. Waiting for downloader to exit.</string>
     <string name="wait_for_download">Wait for the current download to finish first.</string>
     <string name="update_starting">Updating yt-dlp...</string>
     <string name="update_done">yt-dlp update status: %1$s. Version: %2$s</string>
     <string name="update_failed">yt-dlp update failed.</string>
     <string name="open_downloads_failed">Could not open Downloads automatically.</string>
+    <string name="storage_setup_failed">Could not prepare temporary download storage.</string>
     <string name="version_unknown">unknown</string>
 </resources>
