@@ -5,22 +5,24 @@ A native Android app for downloading permitted YouTube videos as simple MP4 file
 ## Features
 
 - Android app written in Kotlin
-- Paste or share a YouTube link into the app
+- Paste a YouTube link or share a message containing one into the app
 - Supports normal YouTube links and YouTube Shorts links
-- MP4-only video options for easier sharing
+- Strict HTTPS and YouTube-host validation
+- Progressive MP4 options up to 360p, 480p, and 720p for easier sharing
 - No audio-only mode
 - Progress bar with live status
-- Stop button for the active download process
+- Stop button with clean cancellation and temporary-file cleanup
 - Update button for the bundled yt-dlp runtime
-- Saves directly into the phone's main `Downloads` folder
+- Publishes completed files into the phone's main `Downloads` folder using Android's supported storage APIs
+- Enforces a 4 GB maximum file size
 - Shows an **Open Downloads** button after a download finishes
 - Hidden debug output that only appears when something fails
 
 ## Sharing notes
 
-Use **Discord MP4 360p (safest)** first. It asks yt-dlp for one MP4 file that already contains both video and audio. That avoids the previous audio-only/extract behavior.
+Use **Discord-ready MP4 up to 360p (most compatible)** first. Every quality option asks yt-dlp for one MP4 file that already contains both video and audio, preferring AVC/AAC for broad playback support. This avoids audio-only results and avoids a separate video/audio merge.
 
-If 360p works, try 480p or 720p. If a higher option fails, the source video may not offer that exact single-file MP4 format.
+If 360p works, try 480p or 720p. YouTube does not provide every resolution as a combined MP4 for every video, so higher options automatically fall back to the best compatible combined MP4 available.
 
 ## Legal use
 
@@ -43,6 +45,12 @@ This repo intentionally does not include the Gradle wrapper binary. Use a local 
 gradle :app:assembleDebug
 ```
 
+Run the validation suite with:
+
+```bash
+gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
 The debug APK will be at:
 
 ```text
@@ -51,8 +59,10 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## Notes
 
-- Downloads are written directly to the phone's main `Downloads` folder.
-- After a file finishes, the app asks Android's media scanner to index it and shows an **Open Downloads** button.
+- Downloads are staged in app-owned storage, then published to the phone's main `Downloads` folder. This works with scoped storage on modern Android.
+- Temporary and partial files are removed after success, failure, or cancellation.
+- Android 9 and older still request legacy write permission when needed.
+- The app accepts HTTPS links only and rejects lookalike hosts.
 - If extraction breaks, tap **Update yt-dlp** in the app.
 - The app only accepts YouTube / youtu.be URLs and does not use cookies.
 
@@ -60,8 +70,10 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ```text
 app/src/main/java/dev/lamurbob/youtubedl/
-  MainActivity.kt      Main screen, download logic, update logic
-  YoutubeDlApp.kt      Initializes yt-dlp
+  MainActivity.kt       Main screen, download logic, update logic
+  DownloadPublisher.kt  Scoped-storage and legacy Downloads publishing
+  YoutubeUrlParser.kt   HTTPS host validation and shared-text extraction
+  YoutubeDlApp.kt       Initializes yt-dlp
 ```
 
 ## License
