@@ -5,14 +5,15 @@ plugins {
 
 android {
     namespace = "dev.lamurbob.youtubedl"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "dev.lamurbob.youtubedl"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 2
-        versionName = "0.2.0"
+        targetSdk = 35
+        versionCode = 3
+        versionName = "0.3.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             abiFilters.add("x86")
@@ -65,4 +66,7 @@ dependencies {
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$youtubedlAndroid")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core-ktx:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit-ktx:1.2.1")
 }

@@ -1,36 +1,14 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">YouTubeDL</string>
-    <string name="app_subtitle">Download permitted YouTube videos as simple MP4 files for easy sharing.</string>
-    <string name="youtube_url">YouTube URL</string>
-    <string name="quality">Quality</string>
-    <string name="rights_checkbox">I confirm I have permission or a lawful reason to download this video.</string>
-    <string name="download">Download MP4</string>
-    <string name="stop">Stop current download</string>
-    <string name="update_ytdlp">Update yt-dlp</string>
-    <string name="open_downloads">Open Downloads</string>
-    <string name="status_idle">Idle. Paste a YouTube link to begin.</string>
-    <string name="output_waiting">Downloader output will appear here only if something breaks.</string>
-    <string name="output_empty">No command output returned.</string>
-    <string name="url_required">Paste a YouTube URL first.</string>
-    <string name="url_youtube_only">Only HTTPS YouTube and youtu.be URLs are supported.</string>
-    <string name="rights_required">Check the permission box first.</string>
-    <string name="storage_permission_needed">Storage permission is needed on older Android versions.</string>
-    <string name="download_already_running">A download is already running.</string>
-    <string name="download_starting">Starting MP4 download...</string>
-    <string name="download_running">Download running...</string>
-    <string name="download_complete">Download complete. Saved in %1$s</string>
-    <string name="download_complete_file">Download complete: %1$s</string>
-    <string name="download_success">Download successful.</string>
-    <string name="download_stopped">Download stopped.</string>
-    <string name="download_failed">Download failed. Try updating yt-dlp, then use the 360p option.</string>
-    <string name="download_file_missing">The downloader finished without returning an MP4 file.</string>
-    <string name="stop_requested">Stop requested. Waiting for downloader to exit.</string>
-    <string name="wait_for_download">Wait for the current download to finish first.</string>
-    <string name="update_starting">Updating yt-dlp...</string>
-    <string name="update_done">yt-dlp update status: %1$s. Version: %2$s</string>
-    <string name="update_failed">yt-dlp update failed.</string>
-    <string name="open_downloads_failed">Could not open Downloads automatically.</string>
-    <string name="storage_setup_failed">Could not prepare temporary download storage.</string>
-    <string name="version_unknown">unknown</string>
+<string name="app_name">YouTubeDL</string><string name="tagline">Good videos. Ready to go.</string>
+<string name="intro">Save a video or Short as an MP4. Pick a quality, add your link, and we’ll take it from there.</string>
+<string name="url_hint">YouTube video or Shorts link</string><string name="paste">Paste link</string>
+<string name="quality">VIDEO QUALITY</string><string name="download">Download MP4</string>
+<string name="format_note">MP4 · Video + audio · Saved in Downloads</string>
+<string name="quality_note">Best available up to your selection. Larger videos take more space.</string>
+<string name="your_downloads">Your downloads</string><string name="clear">Clear history</string>
+<string name="empty_title">Your next video starts here.</string><string name="empty_body">Paste a link above or share a video from YouTube to this app. Downloads keep running when you leave this screen.</string>
+<string name="engine_title">Keep the engine fresh</string><string name="engine_note">YouTube changes often. We check for engine updates before downloading, once a day.</string>
+<string name="update">Update engine</string><string name="open_downloads">Open Downloads</string>
+<string name="legal_note">Download only content you own or have permission to save. Private, restricted, and live videos may be unavailable.</string>
+<string name="version_label">ANDROID · 0.3.0</string><string name="play">Play</string><string name="share">Share</string><string name="details">Details</string>
 </resources>
