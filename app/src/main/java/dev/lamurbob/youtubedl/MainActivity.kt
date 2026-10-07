@@ -2,394 +2,253 @@ package dev.lamurbob.youtubedl
 
 import android.Manifest
 import android.app.DownloadManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.text.method.ScrollingMovementMethod
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.CheckBox
-import android.widget.ProgressBar
+import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.textfield.TextInputEditText
-import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLRequest
-import java.io.File
-import java.util.UUID
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private lateinit var urlInput: TextInputEditText
-    private lateinit var qualitySpinner: Spinner
-    private lateinit var rightsCheck: CheckBox
+    private lateinit var quality: Spinner
+    private lateinit var list: LinearLayout
     private lateinit var downloadButton: Button
-    private lateinit var stopButton: Button
     private lateinit var updateButton: Button
-    private lateinit var openDownloadsButton: Button
-    private lateinit var progressBar: ProgressBar
-    private lateinit var statusText: TextView
-    private lateinit var outputText: TextView
-
-    private var downloading = false
-    @Volatile
-    private var stopRequested = false
-    private val processId = "youtubedl-main-download"
-
-    private val formatOptions = linkedMapOf(
-        "Discord-ready MP4 up to 360p (most compatible)" to
-            "best[ext=mp4][vcodec^=avc1][acodec^=mp4a][height<=360]/" +
-            "best[ext=mp4][vcodec!=none][acodec!=none][height<=360]/18",
-        "Discord-ready MP4 up to 480p" to
-            "best[ext=mp4][vcodec^=avc1][acodec^=mp4a][height<=480]/" +
-            "best[ext=mp4][vcodec!=none][acodec!=none][height<=480]/18",
-        "Discord-ready MP4 up to 720p" to
-            "best[ext=mp4][vcodec^=avc1][acodec^=mp4a][height<=720]/" +
-            "best[ext=mp4][vcodec!=none][acodec!=none][height<=720]/22/18"
-    )
-
-    private val progressCallback: (Float, Long, String) -> Unit = { progress, _, line ->
-        runOnUiThread {
-            progressBar.isIndeterminate = false
-            progressBar.progress = progress.toInt().coerceIn(0, 100)
-            statusText.text = line.ifBlank { getString(R.string.download_running) }
+    private var pendingDownload: Pair<String, Int>? = null
+    private val rows = mutableMapOf<String, View>()
+    private val renderedItems = mutableMapOf<String, DownloadItem>()
+    private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        val pending = pendingDownload
+        pendingDownload = null
+        if (pending != null) {
+            if (Build.VERSION.SDK_INT <= 28 && ContextCompat.checkSelfPermission(this,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                toast("Storage permission is required to save into Downloads on this Android version.")
+            } else {
+                enqueue(pending.first, pending.second)
+            }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        val root = findViewById<View>(R.id.root)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val system = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+            view.setPadding(system.left, system.top, system.right, system.bottom)
+            insets
+        }
+        urlInput = findViewById(R.id.url_input)
+        quality = findViewById(R.id.quality_spinner)
+        list = findViewById(R.id.download_list)
+        downloadButton = findViewById(R.id.download_button)
+        updateButton = findViewById(R.id.update_button)
+        quality.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item,
+            listOf("360p · Smaller files", "480p · Balanced", "720p · HD", "1080p · Full HD"))
+            .apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
+        val prefs = getPreferences(MODE_PRIVATE)
+        quality.setSelection(prefs.getInt("quality", 0).coerceIn(0, 3))
+        downloadButton.setOnClickListener { startDownload() }
+        updateButton.setOnClickListener { startServiceAction(Intent(this, DownloadService::class.java).setAction(DownloadService.UPDATE)) }
+        findViewById<Button>(R.id.paste_button).setOnClickListener {
+            val text = (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).primaryClip
+                ?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
+            val url = YoutubeUrlParser.extractSupportedUrl(text)
+            if (url != null) { urlInput.setText(url); urlInput.error = null }
+            else toast("The clipboard does not contain a supported YouTube link.")
+        }
+        findViewById<Button>(R.id.open_downloads_button).setOnClickListener {
+            launchExternal(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS))
+        }
+        findViewById<Button>(R.id.clear_button).setOnClickListener { DownloadStore.clearFinished() }
+        if (savedInstanceState == null) loadIntent(intent)
+        pendingDownload = savedInstanceState?.getString("pending_url")?.let {
+            it to savedInstanceState.getInt("pending_height", 360)
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { DownloadStore.items.collect { render(it) } }
+                launch { DownloadStore.engineMessage.collect { findViewById<TextView>(R.id.engine_status).text = it } }
+                launch { DownloadStore.engineBusy.collect { updateButtons() } }
+            }
+        }
+    }
 
-        bindViews()
-        setupQualitySpinner()
-        setupButtons()
-        outputText.movementMethod = ScrollingMovementMethod()
-        outputText.visibility = View.GONE
-        openDownloadsButton.visibility = View.GONE
-        loadUrlFromIntent(intent)
+    override fun onSaveInstanceState(outState: Bundle) {
+        pendingDownload?.let { outState.putString("pending_url", it.first); outState.putInt("pending_height", it.second) }
+        super.onSaveInstanceState(outState)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        loadUrlFromIntent(intent)
+        loadIntent(intent)
     }
 
-    private fun bindViews() {
-        urlInput = findViewById(R.id.url_input)
-        qualitySpinner = findViewById(R.id.quality_spinner)
-        rightsCheck = findViewById(R.id.rights_check)
-        downloadButton = findViewById(R.id.download_button)
-        stopButton = findViewById(R.id.stop_button)
-        updateButton = findViewById(R.id.update_button)
-        openDownloadsButton = findViewById(R.id.open_downloads_button)
-        progressBar = findViewById(R.id.progress_bar)
-        statusText = findViewById(R.id.status_text)
-        outputText = findViewById(R.id.output_text)
-    }
-
-    private fun setupQualitySpinner() {
-        val adapter = ArrayAdapter(
-            this,
-            android.R.layout.simple_spinner_item,
-            formatOptions.keys.toList()
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        qualitySpinner.adapter = adapter
-    }
-
-    private fun setupButtons() {
-        downloadButton.setOnClickListener { startDownload() }
-        stopButton.setOnClickListener { stopDownload() }
-        updateButton.setOnClickListener { updateRuntime() }
-        openDownloadsButton.setOnClickListener { openDownloads() }
-        stopButton.isEnabled = false
-    }
-
-    private fun startDownload() {
-        if (downloading) {
-            toast(getString(R.string.download_already_running))
-            return
-        }
-
-        val url = urlInput.text?.toString()?.trim().orEmpty()
-        if (url.isBlank()) {
-            urlInput.error = getString(R.string.url_required)
-            return
-        }
-
-        if (!YoutubeUrlParser.isSupported(url)) {
-            urlInput.error = getString(R.string.url_youtube_only)
-            return
-        }
-        urlInput.error = null
-
-        if (!rightsCheck.isChecked) {
-            statusText.text = getString(R.string.rights_required)
-            return
-        }
-
-        if (!ensureStoragePermission()) {
-            toast(getString(R.string.storage_permission_needed))
-            return
-        }
-
-        val workDir = runCatching { createDownloadWorkDirectory() }.getOrElse { error ->
-            statusText.text = getString(R.string.storage_setup_failed)
-            showOutput(error.message ?: error.toString())
-            return
-        }
-        val outputTemplate = File(workDir, "%(title).120B [%(id)s].%(ext)s").absolutePath
-        val selectedFormat = selectedFormat()
-
-        stopRequested = false
-        outputText.visibility = View.GONE
-        openDownloadsButton.visibility = View.GONE
-        setDownloadingState(true)
-        statusText.text = getString(R.string.download_starting)
-
-        lifecycleScope.launch {
-            var completedDownload: PublishedDownload? = null
-            var failure: Exception? = null
-
-            try {
-                val response = withContext(Dispatchers.IO) {
-                    YoutubeDL.init(applicationContext)
-
-                    val request = YoutubeDLRequest(url).apply {
-                        addOption("--no-playlist")
-                        addOption("--no-mtime")
-                        addOption("--restrict-filenames")
-                        addOption("--newline")
-                        addOption("--print", "after_move:filepath")
-                        addOption("--max-filesize", "4G")
-                        addOption("--socket-timeout", "30")
-                        addOption("--retries", "3")
-                        addOption("-f", selectedFormat)
-                        addOption("-o", outputTemplate)
-                    }
-
-                    YoutubeDL.execute(request, processId, progressCallback)
-                }
-
-                if (!stopRequested) {
-                    completedDownload = withContext(Dispatchers.IO) {
-                        val downloadedFile = extractDownloadedFile(response.out, workDir)
-                            ?: throw IllegalStateException(
-                                getString(R.string.download_file_missing)
-                            )
-                        DownloadPublisher.publish(applicationContext, downloadedFile)
-                    }
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Exception) {
-                failure = error
-            } finally {
-                withContext(Dispatchers.IO + NonCancellable) {
-                    workDir.deleteRecursively()
-                }
-            }
-
-            val publishedDownload = completedDownload
-            when {
-                stopRequested -> {
-                    progressBar.isIndeterminate = false
-                    progressBar.progress = 0
-                    outputText.visibility = View.GONE
-                    openDownloadsButton.visibility = View.GONE
-                    statusText.text = getString(R.string.download_stopped)
-                    toast(getString(R.string.download_stopped))
-                }
-                publishedDownload != null -> {
-                    progressBar.isIndeterminate = false
-                    progressBar.progress = 100
-                    outputText.visibility = View.GONE
-                    openDownloadsButton.visibility = View.VISIBLE
-                    statusText.text = getString(
-                        R.string.download_complete_file,
-                        publishedDownload.displayName
-                    )
-                    toast(getString(R.string.download_success))
-                }
-                else -> {
-                    progressBar.isIndeterminate = false
-                    progressBar.progress = 0
-                    openDownloadsButton.visibility = View.GONE
-                    statusText.text = getString(R.string.download_failed)
-                    val error = failure
-                    showOutput(error?.message ?: getString(R.string.output_empty))
-                    toast(getString(R.string.download_failed))
-                }
-            }
-
-            setDownloadingState(false)
-            stopRequested = false
-        }
-    }
-
-    private fun stopDownload() {
-        if (!downloading) return
-
-        stopRequested = true
-        stopButton.isEnabled = false
-        runCatching {
-            YoutubeDL.destroyProcessById(processId)
-        }.onFailure { error ->
-            showOutput(error.message ?: error.toString())
-        }
-
-        statusText.text = getString(R.string.stop_requested)
-    }
-
-    override fun onDestroy() {
-        if (downloading) {
-            stopRequested = true
-            runCatching { YoutubeDL.destroyProcessById(processId) }
-        }
-        super.onDestroy()
-    }
-
-    private fun updateRuntime() {
-        if (downloading) {
-            toast(getString(R.string.wait_for_download))
-            return
-        }
-
-        outputText.visibility = View.GONE
-        progressBar.visibility = View.VISIBLE
-        progressBar.isIndeterminate = true
-        statusText.text = getString(R.string.update_starting)
-        updateButton.isEnabled = false
-
-        lifecycleScope.launch {
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    YoutubeDL.init(applicationContext)
-                    YoutubeDL.updateYoutubeDL(
-                        this@MainActivity,
-                        YoutubeDL.UpdateChannel.STABLE
-                    )
-                }
-            }
-
-            result.onSuccess { status ->
-                val version = runCatching { YoutubeDL.versionName(this@MainActivity) }
-                    .getOrDefault(getString(R.string.version_unknown))
-                statusText.text = getString(R.string.update_done, status.toString(), version)
-                outputText.visibility = View.GONE
-            }.onFailure { error ->
-                statusText.text = getString(R.string.update_failed)
-                showOutput(error.message ?: error.toString())
-            }
-
-            progressBar.isIndeterminate = false
-            updateButton.isEnabled = true
-        }
-    }
-
-    private fun selectedFormat(): String {
-        val label = qualitySpinner.selectedItem?.toString().orEmpty()
-        return formatOptions[label] ?: formatOptions.values.first()
-    }
-
-    private fun ensureStoragePermission(): Boolean {
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) return true
-
-        val granted = checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
-            PackageManager.PERMISSION_GRANTED
-
-        if (!granted) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                STORAGE_PERMISSION_REQUEST
-            )
-        }
-
-        return granted
-    }
-
-    private fun createDownloadWorkDirectory(): File {
-        val appDownloads = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
-        val workDir = File(appDownloads, "staging/${UUID.randomUUID()}")
-        check(workDir.mkdirs() || workDir.isDirectory) {
-            getString(R.string.storage_setup_failed)
-        }
-        return workDir
-    }
-
-    private fun setDownloadingState(isDownloading: Boolean) {
-        downloading = isDownloading
-        downloadButton.isEnabled = !isDownloading
-        updateButton.isEnabled = !isDownloading
-        stopButton.isEnabled = isDownloading
-        progressBar.visibility = View.VISIBLE
-        progressBar.isIndeterminate = isDownloading
-        if (!isDownloading) progressBar.isIndeterminate = false
-    }
-
-    private fun showOutput(message: String) {
-        outputText.text = message.takeLast(MAX_OUTPUT_CHARS)
-        outputText.visibility = View.VISIBLE
-    }
-
-    private fun extractDownloadedFile(output: String, downloadDir: File): File? {
-        val downloadRoot = runCatching { downloadDir.canonicalFile }.getOrNull() ?: return null
-        return output
-            .lineSequence()
-            .map { it.trim() }
-            .mapNotNull { line ->
-                runCatching { File(line).canonicalFile }.getOrNull()
-            }
-            .lastOrNull { file ->
-                file.isFile &&
-                    file.parentFile == downloadRoot &&
-                    file.extension.equals("mp4", ignoreCase = true)
-            }
-    }
-
-    private fun openDownloads() {
-        val intent = Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-        runCatching {
-            startActivity(intent)
-        }.onFailure {
-            toast(getString(R.string.open_downloads_failed))
-        }
-    }
-
-    private fun loadUrlFromIntent(intent: Intent?) {
-        val sharedText = when (intent?.action) {
+    private fun loadIntent(intent: Intent?) {
+        val text = when (intent?.action) {
             Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
             Intent.ACTION_VIEW -> intent.dataString
             else -> null
         }
+        YoutubeUrlParser.extractSupportedUrl(text)?.let { urlInput.setText(it) }
+    }
 
-        val sharedUrl = YoutubeUrlParser.extractSupportedUrl(sharedText)
-        if (sharedUrl != null) {
-            urlInput.setText(sharedUrl)
+    private fun startDownload() {
+        val url = YoutubeUrlParser.extractSupportedUrl(urlInput.text?.toString())
+        if (url == null) { urlInput.error = "Paste an HTTPS YouTube video or Shorts link."; return }
+        urlInput.error = null
+        urlInput.setText(url)
+        val height = DownloadPolicy.heights[quality.selectedItemPosition]
+        getPreferences(MODE_PRIVATE).edit().putInt("quality", quality.selectedItemPosition).apply()
+        requestDownload(url, height)
+    }
+
+    private fun requestDownload(url: String, height: Int) {
+        val needed = buildList {
+            if (Build.VERSION.SDK_INT <= 28 && ContextCompat.checkSelfPermission(this@MainActivity,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this@MainActivity,
+                    Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+                !getPreferences(MODE_PRIVATE).getBoolean("notification_asked", false)) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+                getPreferences(MODE_PRIVATE).edit().putBoolean("notification_asked", true).apply()
+            }
+        }
+        if (needed.isNotEmpty()) {
+            pendingDownload = url to height
+            permissions.launch(needed.toTypedArray())
+        } else enqueue(url, height)
+    }
+
+    private fun enqueue(url: String, height: Int) {
+        if (DownloadStore.items.value.count { it.status.active } >= 20) {
+            toast("The queue is full. Wait for a download to finish."); return
+        }
+        startServiceAction(Intent(this, DownloadService::class.java).setAction(DownloadService.ENQUEUE)
+            .putExtra("url", url).putExtra("height", height))
+    }
+
+    private fun startServiceAction(intent: Intent) {
+        runCatching { ContextCompat.startForegroundService(this, intent) }
+            .onFailure { toast("Could not start the download service: ${it.message}") }
+    }
+
+    private fun updateButtons() {
+        val active = DownloadStore.items.value.any { it.status.active }
+        updateButton.isEnabled = !active && !DownloadStore.engineBusy.value
+        downloadButton.text = if (active) "Add to queue" else "Download MP4"
+    }
+
+    private fun render(items: List<DownloadItem>) {
+        updateButtons()
+        val ordered = items.filter { it.status.active } + items.filterNot { it.status.active }.reversed()
+        val ids = ordered.map { it.id }
+        rows.keys.filterNot { it in ids }.toList().forEach { id ->
+            list.removeView(rows.remove(id)); renderedItems.remove(id)
+        }
+        ordered.forEachIndexed { index, item ->
+            val row = rows.getOrPut(item.id) { layoutInflater.inflate(R.layout.download_item, list, false) }
+            if (list.indexOfChild(row) != index) {
+                list.removeView(row)
+                list.addView(row, index)
+            }
+            if (renderedItems[item.id] != item) {
+                bindRow(row, item)
+                renderedItems[item.id] = item
+            }
+        }
+        findViewById<View>(R.id.empty_state).visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+        findViewById<Button>(R.id.clear_button).isEnabled = items.any { !it.status.active }
+        findViewById<TextView>(R.id.queue_summary).text = when (val count = items.count { it.status.active }) {
+            0 -> "Your downloads"
+            1 -> "1 download in progress"
+            else -> "$count downloads in queue"
         }
     }
 
-    private fun toast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    private fun bindRow(row: View, item: DownloadItem) {
+        row.findViewById<TextView>(R.id.item_title).text = item.name.ifBlank { item.url }
+        row.findViewById<TextView>(R.id.item_badge).text = "${item.height}p · MP4 · ${item.status.name.lowercase().replaceFirstChar { it.uppercase() }}"
+        row.findViewById<TextView>(R.id.item_status).text = item.message
+        row.findViewById<LinearProgressIndicator>(R.id.item_progress).apply {
+            visibility = if (item.status.active) View.VISIBLE else View.GONE
+            isIndeterminate = item.progress < 0
+            if (item.progress >= 0) progress = item.progress
+        }
+        val primary = row.findViewById<Button>(R.id.item_primary)
+        val secondary = row.findViewById<Button>(R.id.item_secondary)
+        val details = row.findViewById<Button>(R.id.item_details)
+        secondary.visibility = View.GONE
+        primary.isEnabled = true
+        when {
+            item.status == DownloadStatus.COMPLETE -> {
+                primary.text = "Play"
+                primary.setOnClickListener { openFile(item, false) }
+                secondary.visibility = View.VISIBLE
+                secondary.text = "Share"
+                secondary.setOnClickListener { openFile(item, true) }
+            }
+            item.status.active -> {
+                primary.text = if (item.status == DownloadStatus.QUEUED) "Remove" else "Stop"
+                primary.setOnClickListener { startServiceAction(Intent(this, DownloadService::class.java)
+                    .setAction(DownloadService.CANCEL).putExtra("id", item.id)) }
+            }
+            else -> {
+                primary.text = "Retry"
+                primary.setOnClickListener { requestDownload(item.url, item.height) }
+            }
+        }
+        details.visibility = if (item.details.isBlank()) View.GONE else View.VISIBLE
+        details.setOnClickListener {
+            MaterialAlertDialogBuilder(this).setTitle("Download details").setMessage(item.details)
+                .setPositiveButton("Close", null).setNeutralButton("Copy") { _, _ ->
+                    (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
+                        .setPrimaryClip(ClipData.newPlainText("Download details", item.details))
+                }.show()
+        }
     }
 
-    private companion object {
-        const val STORAGE_PERMISSION_REQUEST = 4201
-        const val MAX_OUTPUT_CHARS = 4_000
+    private fun openFile(item: DownloadItem, share: Boolean) {
+        val uri = Uri.parse(item.uri)
+        val exists = runCatching { contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false)
+        if (!exists) { toast("This file was moved or deleted. Download it again."); return }
+        val intent = if (share) Intent(Intent.ACTION_SEND).apply {
+            type = "video/mp4"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri(item.name, uri)
+        } else Intent(Intent.ACTION_VIEW).setDataAndType(uri, "video/mp4")
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        launchExternal(if (share) Intent.createChooser(intent, "Share MP4") else intent)
     }
+
+    private fun launchExternal(intent: Intent) {
+        runCatching { startActivity(intent) }.onFailure { toast("No app is available to open this file or folder.") }
+    }
+
+    private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }

@@ -1,81 +1,51 @@
-# YouTubeDL
+# YouTubeDL for Android
 
-A native Android app for downloading permitted YouTube videos as simple MP4 files.
+A native Android downloader for public YouTube videos and Shorts. Version **0.3.0** adds a background queue, a redesigned screen, automatic engine updates, and compatible MP4 merging.
 
-## Features
+## What changed
 
-- Android app written in Kotlin
-- Paste a YouTube link or share a message containing one into the app
-- Supports normal YouTube links and YouTube Shorts links
-- Strict HTTPS and YouTube-host validation
-- Progressive MP4 options up to 360p, 480p, and 720p for easier sharing
-- No audio-only mode
-- Progress bar with live status
-- Stop button with clean cancellation and temporary-file cleanup
-- Update button for the bundled yt-dlp runtime
-- Publishes completed files into the phone's main `Downloads` folder using Android's supported storage APIs
-- Enforces a 4 GB maximum file size
-- Shows an **Open Downloads** button after a download finishes
-- Hidden debug output that only appears when something fails
+- **Modern downloads:** choose up to 360p, 480p, 720p, or 1080p. Download H.264 video and AAC audio, then merge them into one MP4 with initialized FFmpeg. Compatible combined streams remain a fallback; there are no hardcoded format IDs or audio-only modes.
+- **Engine maintenance:** checks the stable yt-dlp channel before a download, at most once daily after a successful check. Update engine forces a check. Failed update checks keep the installed engine available. The Android wrapper includes QuickJS, and matching EJS scripts can be fetched from upstream GitHub when needed.
+- **Background queue:** up to 20 queued videos, ongoing progress notification and Stop action, independent of the screen. Rotation and switching apps keep downloads running. Android can still stop an app; interrupted jobs show Retry after relaunch instead of silently redownloading.
+- **Useful history:** the latest 50 finished records with Play, Share, Retry, and copyable error details. Clear history removes records, never downloaded videos.
+- **Safer output:** check for both H.264 and AAC tracks before publishing to Android Downloads. Enforce a 4 GiB final-file limit. Cancelled or failed jobs clean staging and partial publication. Pending MediaStore entries are recovered after interruption.
+- **Cleaner interface:** dark layout, large controls, clipboard paste, saved quality choice, queue progress, and direct sharing with the correct `video/mp4` MIME type.
 
-## Sharing notes
+## Install
 
-Use **Discord-ready MP4 up to 360p (most compatible)** first. Every quality option asks yt-dlp for one MP4 file that already contains both video and audio, preferring AVC/AAC for broad playback support. This avoids audio-only results and avoids a separate video/audio merge.
+Open [Android CI](https://github.com/lamurbob28-prog/YouTubeDL/actions/workflows/android.yml), choose the latest successful run for `main`, and download **YouTubeDL-debug-apk** under Artifacts. Extract the ZIP and install its APK on Android 7 or newer. Android may ask to allow installation from your browser or file manager.
 
-If 360p works, try 480p or 720p. YouTube does not provide every resolution as a combined MP4 for every video, so higher options automatically fall back to the best compatible combined MP4 available.
+These are development APKs. An older APK signed with a different debug key cannot be updated in place; Android reports a signature conflict. Export any app data you need before uninstalling an old build. Videos already saved in Downloads remain outside app storage.
 
-## Legal use
+## Use
 
-Use this only for content you are allowed to download, such as your own uploads, videos where you have permission, public-domain videos, or Creative Commons videos where saving/reuse is allowed.
+1. Paste an HTTPS YouTube link, paste a message containing one, or use **Share → YouTubeDL** from YouTube.
+2. Select quality and tap **Download MP4**. Add more links to the queue while it runs.
+3. Use **Play**, **Share**, or **Open Downloads** once it finishes.
 
-## Build
+Notification permission is optional on Android 13+. On Android 9 and older, allow storage access to save into Downloads. Downloads use a foreground data-sync service and a bounded wake lock. Force stopping the app ends downloads; Retry starts interrupted jobs again. Queued jobs are not automatically resumed after process death.
 
-### Android Studio
+Files contain AVC/H.264 video and AAC audio for broad playback compatibility. Discord and other apps impose their own upload limits; **this app does not promise a particular file size or an inline embed**. YouTube may offer a lower resolution than selected. Live streams are excluded. Private, age-restricted, region-blocked, or sign-in-required videos may not download; cookies and account-login bypasses are not implemented.
 
-1. Clone the repo.
-2. Open the folder in Android Studio.
-3. Let Gradle sync.
-4. Run the `app` configuration on your phone or emulator.
+## Build and verify
 
-### Command line
+Use Java 17, Android SDK 35, and Gradle 8.10.2 (Android Studio or a local Gradle installation). The existing repository does not include a Gradle wrapper.
 
-This repo intentionally does not include the Gradle wrapper binary. Use a local Gradle install or Android Studio's Gradle support.
-
-```bash
-gradle :app:assembleDebug
-```
-
-Run the validation suite with:
-
-```bash
+```sh
 gradle :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-The debug APK will be at:
+The APK is `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions runs the same gates and uploads the APK and verification reports. Unit tests cover link validation, output containment, empty/oversized results, cancellation, and publication copy limits. The format selection integration test exercises yt-dlp against local fixture metadata without contacting YouTube.
 
-```text
-app/build/outputs/apk/debug/app-debug.apk
-```
+On a device, verify a public regular video and a Short, background/rotate during a download, stop an active download, remove a queued job, deny notification permission, and Play/Share the output. A successful build is not proof that every YouTube video or network is supported.
 
-## Notes
+## Development layout
 
-- Downloads are staged in app-owned storage, then published to the phone's main `Downloads` folder. This works with scoped storage on modern Android.
-- Temporary and partial files are removed after success, failure, or cancellation.
-- Android 9 and older still request legacy write permission when needed.
-- The app accepts HTTPS links only and rejects lookalike hosts.
-- If extraction breaks, tap **Update yt-dlp** in the app.
-- The app only accepts YouTube / youtu.be URLs and does not use cookies.
+- `MainActivity.kt`: input, queue/history cards, permissions and sharing.
+- `DownloadService.kt`: foreground queue, cancellation, wake lock and notifications.
+- `DownloadEngine.kt`: initialization, updates, requests and codec validation.
+- `DownloadPublisher.kt`: scoped-storage publishing, recovery and legacy sharing.
+- `DownloadStore.kt`: observable state and persisted history.
+- `DownloadPolicy.kt`, `DownloadCopy.kt`, `YoutubeUrlParser.kt`: tested policies and helpers.
 
-## Project layout
-
-```text
-app/src/main/java/dev/lamurbob/youtubedl/
-  MainActivity.kt       Main screen, download logic, update logic
-  DownloadPublisher.kt  Scoped-storage and legacy Downloads publishing
-  YoutubeUrlParser.kt   HTTPS host validation and shared-text extraction
-  YoutubeDlApp.kt       Initializes yt-dlp
-```
-
-## License
-
-MIT
+Download only material you own or have permission to save. MIT license applies to app source; bundled libraries retain their own licenses.
